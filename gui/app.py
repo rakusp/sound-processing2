@@ -34,7 +34,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.duration = 0
         self.frame_len = 25
         self.frame_hop = 10
-        self.l = 10
+        self.lag = 10
         self._setup()
 
     def _setup(self):
@@ -141,20 +141,20 @@ class MainWindow(QtWidgets.QMainWindow):
         win_hop_validator.setBottom(1)
         self.win_hop_field.setValidator(win_hop_validator)
 
-        l_label = QtWidgets.QLabel(text='lag')
-        self.l_field = QtWidgets.QLineEdit()
-        self.l_field.setText(str(self.l))
-        self.l_field.editingFinished.connect(self.params_changed)
-        l_validator = QIntValidator()
-        l_validator.setBottom(1)
-        self.l_field.setValidator(l_validator)
+        lag_label = QtWidgets.QLabel(text='lag')
+        self.lag_field = QtWidgets.QLineEdit()
+        self.lag_field.setText(str(self.lag))
+        self.lag_field.editingFinished.connect(self.params_changed)
+        lag_validator = QIntValidator()
+        lag_validator.setBottom(1)
+        self.lag_field.setValidator(lag_validator)
 
         params_layout.addWidget(win_len_label, 0, 0)
         params_layout.addWidget(self.win_len_field, 0, 1)
         params_layout.addWidget(win_hop_label, 1, 0)
         params_layout.addWidget(self.win_hop_field, 1, 1)
-        params_layout.addWidget(l_label, 2, 0)
-        params_layout.addWidget(self.l_field, 2, 1)
+        params_layout.addWidget(lag_label, 2, 0)
+        params_layout.addWidget(self.lag_field, 2, 1)
 
         # setup layouts
         metrics_frame = QtWidgets.QFrame()
@@ -203,7 +203,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.player.setMedia(content)
 
             self._set_values()
-            self._mark_audio_type()
+            self._mark_audio_type(axis=0)
             self.plot.axes[0].legend()
             self.plot.draw()
 
@@ -224,7 +224,7 @@ class MainWindow(QtWidgets.QMainWindow):
         frames, frame_length = framing(sig=scale_data(self.data), fs=self.fps,
                                        win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         if use_l:
-            data = np.apply_along_axis(func1d=func, axis=1, arr=frames, l=self.l)
+            data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
         else:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames)
 
@@ -232,6 +232,7 @@ class MainWindow(QtWidgets.QMainWindow):
         time_seconds = len(self.data) / self.fps
         self.plot.axes[1].plot(np.linspace(0, time_seconds, len(data)), data)
         self.plot.axes[1].set_xlabel('Time (s)')
+        self._mark_audio_type(axis=1)
         self.plot.draw()
 
     def _set_values(self):
@@ -242,8 +243,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.ste_field.setText(str(round(short_time_energy(data), 3)))
         self.zcr_field.setText(str(round(zero_crossing_rate(data), 3)))
-        self.acf_field.setText(str(round(autocorrelation_function(data, l=self.l), 3)))
-        self.amd_field.setText(str(round(average_magnitude_difference(data, l=self.l), 3)))
+        self.acf_field.setText(str(round(autocorrelation_function(data, lag=self.lag), 3)))
+        self.amd_field.setText(str(round(average_magnitude_difference(data, lag=self.lag), 3)))
 
     def audio_play(self):
         if self.player.state() == QMediaPlayer.PlayingState:
@@ -269,7 +270,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def params_changed(self):
         frame_len = int(self.win_len_field.text())
         frame_hop = int(self.win_hop_field.text())
-        l = int(self.l_field.text())
+        lag = int(self.lag_field.text())
 
         if frame_len < frame_hop:
             msg = QtWidgets.QMessageBox()
@@ -282,7 +283,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.frame_len = frame_len
         self.frame_hop = frame_hop
-        self.l = l
+        self.lag = lag
 
         self.change_plot(s=self.plot_type_menu.currentText())
 
@@ -298,20 +299,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._set_values()
 
-    def _mark_audio_type(self):
-        # example usage
-        silence = [[1, 2], [3, 5], [7, 8]]
-        voice = [[4.5, 6]]
+    def _mark_audio_type(self, axis):
+        # Silent detection
+        frame_length = 0.02 # for now this value is fixed
+        frames, _ = framing(scale_data(self.data), self.fps, frame_length, frame_length)
+        silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=5e-3)
 
-        for i, x in enumerate(silence):
-            self._color_region(x[0], x[1], 'red', '_'*i + 'cisza')
+        j = 0
+        for i in range(len(silence)):
+            if silence[i]:
+                self._color_region(axis, frame_length*i, frame_length*(i+1), 'red', '_'*j + 'cisza')
+                j += 1
 
-        for i, x in enumerate(voice):
-            self._color_region(x[0], x[1], 'blue', '_'*i + 'głos')
-
-    def _color_region(self, x1, x2, color, label):
-        self.plot.axes[0].axvspan(x1, x2, color=color, label=label, alpha=0.5)
-        self.plot.axes[1].axvspan(x1, x2, color=color, label=label, alpha=0.5)
+    def _color_region(self, axis, x1, x2, color, label):
+        self.plot.axes[axis].axvspan(x1, x2, facecolor=color, label=label, alpha=0.3)
 
 
 def hhmmss(ms):
