@@ -2,6 +2,8 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtCore import QUrl
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from matplotlib import pyplot as plt
+
 from gui.functions import *
 from scipy.io.wavfile import read
 import numpy as np
@@ -41,7 +43,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar_layout = QtWidgets.QHBoxLayout()
 
         # plot and controls
-        toolbar = NavigationToolbar2QT(self.plot, self)
+        self.toolbar = NavigationToolbar2QT(self.plot, self)
 
         load_button = QtWidgets.QPushButton(text='Load File')
         load_button.clicked.connect(self.load_file)
@@ -54,7 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                'Average Magnitude Difference': (average_magnitude_difference, True)}
         self.plot_type_menu.currentTextChanged.connect(self.change_plot)
 
-        toolbar_layout.addWidget(toolbar)
+        toolbar_layout.addWidget(self.toolbar)
         toolbar_layout.addWidget(self.plot_type_menu)
         toolbar_layout.addWidget(load_button)
         plot_layout.addLayout(toolbar_layout)
@@ -201,6 +203,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.player.setMedia(content)
 
             self._set_values()
+            self._mark_audio_type()
+            self.plot.axes[0].legend()
+            self.plot.draw()
 
     def _draw_plot(self, fps, data):
         self.plot.fig.clear(keep_observers=True)
@@ -210,7 +215,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.line1 = self.plot.axes[0].axvline(x=0, color='green')
         self.line2 = self.plot.axes[0].axvline(x=(len(data) / fps), color='red')
         self.range_field.setText(str(int(abs(self.line1.get_xdata()[0] - self.line2.get_xdata()[0]) * 1000)))
-        self.plot.draw()
 
     def change_plot(self, s):
         func, use_l = self.plot_type_dict.get(s)
@@ -283,7 +287,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.change_plot(s=self.plot_type_menu.currentText())
 
     def select_range(self, event):
-        if self.data is None:
+        if (self.data is None) or (event.xdata is None) or (self.toolbar.mode != ''):
             return
         if event.button == 1:  # left
             self.line1.set_xdata(min(self.duration / 1000, max(0, event.xdata)))
@@ -293,6 +297,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.range_field.setText(str(int(abs(self.line1.get_xdata()[0] - self.line2.get_xdata()[0]) * 1000)))
 
         self._set_values()
+
+    def _mark_audio_type(self):
+        # example usage
+        silence = [[1, 2], [3, 5], [7, 8]]
+        voice = [[4.5, 6]]
+
+        for i, x in enumerate(silence):
+            self._color_region(x[0], x[1], 'red', '_'*i + 'cisza')
+
+        for i, x in enumerate(voice):
+            self._color_region(x[0], x[1], 'blue', '_'*i + 'głos')
+
+    def _color_region(self, x1, x2, color, label):
+        self.plot.axes[0].axvspan(x1, x2, color=color, label=label, alpha=0.5)
+        self.plot.axes[1].axvspan(x1, x2, color=color, label=label, alpha=0.5)
 
 
 def hhmmss(ms):
