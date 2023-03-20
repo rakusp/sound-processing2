@@ -102,34 +102,34 @@ def zero_crossing_rate(data):
     return (1 / (2 * n)) * (np.sum(np.abs(np.sign(data[1:n]) - np.sign(data[0:n - 1]))))
 
 
-def autocorrelation_function(data, l):
+def autocorrelation_function(data, lag):
     """
     Compute autocorrelation function for single signal frame.
 
     Args:
         data (array) : single signal frame
-        l (int) : lag number
+        lag (int) : lag number
 
     Returns:
         Autocorrelation function
     """
     n = len(data)
-    return np.sum(np.multiply((data[l:n]), (data[0:n - l])))
+    return np.sum(np.multiply((data[lag:n]), (data[0:n - lag])))
 
 
-def average_magnitude_difference(data, l):
+def average_magnitude_difference(data, lag):
     """
     Compute average magnitude difference parameter for single signal frame.
 
     Args:
         data (array) : single signal frame
-        l (int) : lag number
+        lag (int) : lag number
 
     Returns:
         Average magnitude difference
     """
     n = len(data)
-    return np.sum(np.abs(np.sign(data[l:n]) - np.sign(data[0:n - l])))
+    return np.sum(np.abs(np.sign(data[lag:n]) - np.sign(data[0:n - lag])))
 
 
 def scale_data(data):
@@ -146,3 +146,19 @@ def scale_data(data):
     max_val = np.max(data)
     scale = max(abs(np.min(data)), abs(np.max(data)))
     return np.divide(data, scale)
+
+def detect_silence(data, vol_max):
+    """
+    Detects silent for given signal data based on average abs value.
+
+    Args:
+        data (array) : one dimensional signal
+
+    Returns:
+        Boolean which indicate whether silence was detected 
+    """
+    mean_vol = np.sum(np.abs(data))/len(data)
+    if mean_vol > vol_max:
+        return False
+    else:
+        return True
