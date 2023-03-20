@@ -63,30 +63,86 @@ def framing(sig, fs, win_len=0.025, win_hop=0.01):
 
 
 def short_time_energy(data):
+    """
+    Compute short time energy parameter for single signal frame.
+
+    Args:
+        data (array) : single signal frame
+
+    Returns:
+        Short time energy
+    """
     return (1 / len(data)) * (np.sum(np.power(data, 2)))
 
 
 def volume(data):
+    """
+    Compute volume parameter for single signal frame.
+
+    Args:
+        data (array) : single signal frame
+
+    Returns:
+        Volume
+    """
     return np.sqrt(short_time_energy(data))
 
 
 def zero_crossing_rate(data):
+    """
+    Compute zero crossing rate (ZCR) parameter for single signal frame.
+
+    Args:
+        data (array) : single signal frame
+
+    Returns:
+        Zero crossing rate
+    """
     n = len(data)
     return (1 / (2 * n)) * (np.sum(np.abs(np.sign(data[1:n]) - np.sign(data[0:n - 1]))))
 
 
 def autocorrelation_function(data, l):
+    """
+    Compute autocorrelation function for single signal frame.
+
+    Args:
+        data (array) : single signal frame
+        l (int) : lag number
+
+    Returns:
+        Autocorrelation function
+    """
     n = len(data)
     return np.sum(np.multiply((data[l:n]), (data[0:n - l])))
 
 
 def average_magnitude_difference(data, l):
+    """
+    Compute average magnitude difference parameter for single signal frame.
+
+    Args:
+        data (array) : single signal frame
+        l (int) : lag number
+
+    Returns:
+        Average magnitude difference
+    """
     n = len(data)
     return np.sum(np.abs(np.sign(data[l:n]) - np.sign(data[0:n - l])))
 
 
 def scale_data(data):
+    """
+    Scale given signal data to range [-1,1] based on the biggest absolute value of signal.
+
+    Args:
+        data (array) : one dimensional signal
+
+    Returns:
+        Scaled siganl data
+    """
     min_val = np.min(data)
     max_val = np.max(data)
-    scale = max((-np.min(data)), np.max(data))
+    scale = max(abs(np.min(data)), abs(np.max(data)))
     return np.divide(data, scale)
