@@ -141,7 +141,7 @@ class MainWindow(QtWidgets.QMainWindow):
         win_hop_validator.setBottom(1)
         self.win_hop_field.setValidator(win_hop_validator)
 
-        l_label = QtWidgets.QLabel(text='l')
+        l_label = QtWidgets.QLabel(text='lag')
         self.l_field = QtWidgets.QLineEdit()
         self.l_field.setText(str(self.l))
         self.l_field.editingFinished.connect(self.params_changed)
