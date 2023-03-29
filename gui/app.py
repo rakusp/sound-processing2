@@ -49,11 +49,12 @@ class MainWindow(QtWidgets.QMainWindow):
         load_button.clicked.connect(self.load_file)
         self.plot_type_menu = QtWidgets.QComboBox()
         self.plot_type_menu.addItems(['Short Time Energy', 'Zero Crossing Rate', 'Autocorrelation Function',
-                                      'Average Magnitude Difference'])
-        self.plot_type_dict = {'Short Time Energy': (short_time_energy, False),
-                               'Zero Crossing Rate': (zero_crossing_rate, False),
-                               'Autocorrelation Function': (autocorrelation_function, True),
-                               'Average Magnitude Difference': (average_magnitude_difference, True)}
+                                      'Average Magnitude Difference', 'Fundamental Frequency Detection'])
+        self.plot_type_dict = {'Short Time Energy': (short_time_energy, False, False),
+                               'Zero Crossing Rate': (zero_crossing_rate, False, False),
+                               'Autocorrelation Function': (autocorrelation_function, True, False),
+                               'Average Magnitude Difference': (average_magnitude_difference, True, False),
+                               'Fundamental Frequency Detection': (fundamental_frequency_detection, False, True)}
         self.plot_type_menu.currentTextChanged.connect(self.change_plot)
 
         toolbar_layout.addWidget(self.toolbar)
@@ -74,6 +75,7 @@ class MainWindow(QtWidgets.QMainWindow):
         tip_label.setFixedHeight(15)
         plot_layout.addWidget(tip_label)
         self.plot.mpl_connect('button_press_event', self.select_range)
+        self.plot.mpl_connect('button_press_event', self.calculate_metrics_between_lines)
 
         # plot info
         info_layout = QtWidgets.QVBoxLayout()
@@ -93,6 +95,14 @@ class MainWindow(QtWidgets.QMainWindow):
         range_label = QtWidgets.QLabel(text='Selected range (ms):')
         self.range_field = QtWidgets.QLineEdit()
         self.range_field.setReadOnly(True)
+
+        lster_label = QtWidgets.QLabel(text='LSTER:')
+        self.lster_field = QtWidgets.QLineEdit()
+        self.lster_field.setReadOnly(True)
+
+        hzcrr_label = QtWidgets.QLabel(text='HZCRR:')
+        self.hzcrr_field = QtWidgets.QLineEdit()
+        self.hzcrr_field.setReadOnly(True)
 
         ste_label = QtWidgets.QLabel(text='STE:')
         self.ste_field = QtWidgets.QLineEdit()
@@ -114,14 +124,18 @@ class MainWindow(QtWidgets.QMainWindow):
         metrics_layout.addWidget(self.play_button, 0, 1)
         metrics_layout.addWidget(range_label, 1, 0)
         metrics_layout.addWidget(self.range_field, 1, 1)
-        metrics_layout.addWidget(ste_label, 2, 0)
-        metrics_layout.addWidget(self.ste_field, 2, 1)
-        metrics_layout.addWidget(zcr_label, 3, 0)
-        metrics_layout.addWidget(self.zcr_field, 3, 1)
-        metrics_layout.addWidget(acf_label, 4, 0)
-        metrics_layout.addWidget(self.acf_field, 4, 1)
-        metrics_layout.addWidget(amd_label, 5, 0)
-        metrics_layout.addWidget(self.amd_field, 5, 1)
+        metrics_layout.addWidget(lster_label, 2, 0)
+        metrics_layout.addWidget(self.lster_field, 2, 1)
+        metrics_layout.addWidget(hzcrr_label, 3, 0)
+        metrics_layout.addWidget(self.hzcrr_field, 3, 1)
+        metrics_layout.addWidget(ste_label, 4, 0)
+        metrics_layout.addWidget(self.ste_field, 4, 1)
+        metrics_layout.addWidget(zcr_label, 5, 0)
+        metrics_layout.addWidget(self.zcr_field, 5, 1)
+        metrics_layout.addWidget(acf_label, 6, 0)
+        metrics_layout.addWidget(self.acf_field, 6, 1)
+        metrics_layout.addWidget(amd_label, 7, 0)
+        metrics_layout.addWidget(self.amd_field, 7, 1)
 
         # plotting params
         params_layout = QtWidgets.QGridLayout()
@@ -217,7 +231,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.range_field.setText(str(int(abs(self.line1.get_xdata()[0] - self.line2.get_xdata()[0]) * 1000)))
 
     def change_plot(self, s):
-        func, use_l = self.plot_type_dict.get(s)
+        func, use_l, use_fs = self.plot_type_dict.get(s)
         if (self.fps is None) or (self.data is None):
             return
 
@@ -225,6 +239,8 @@ class MainWindow(QtWidgets.QMainWindow):
                                        win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         if use_l:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
+        elif use_fs:
+            data = np.apply_along_axis(func1d=func, axis=1, arr=frames, fs=self.fps)
         else:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames)
 
@@ -239,8 +255,12 @@ class MainWindow(QtWidgets.QMainWindow):
         x1 = self.line1.get_xdata()[0]
         x2 = self.line2.get_xdata()[0]
         data = scale_data(self.data)[int(min(x1, x2) * self.fps):int(max(x1, x2) * self.fps)]
+        frames, _ = framing(sig=data, fs=self.fps,
+                                       win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         if len(data) == 0:
             return
+        self.lster_field.setText(str(round(low_short_time_energy_ratio(frames), 3)))
+        self.hzcrr_field.setText(str(round(high_zero_crossing_rate_ratio(frames), 3)))
         self.ste_field.setText(str(round(short_time_energy(data), 3)))
         self.zcr_field.setText(str(round(zero_crossing_rate(data), 3)))
         self.acf_field.setText(str(round(autocorrelation_function(data, lag=self.lag), 3)))
@@ -295,9 +315,33 @@ class MainWindow(QtWidgets.QMainWindow):
         elif event.button == 3:  # right
             self.line2.set_xdata(min(self.duration / 1000, max(0, event.xdata)))
         self.plot.draw()
-        self.range_field.setText(str(int(abs(self.line1.get_xdata()[0] - self.line2.get_xdata()[0]) * 1000)))
+        
+        if type(self.line1.get_xdata()) == type([1,2]):
+            x1 = self.line1.get_xdata()[0]
+        else:
+            x1 = self.line1.get_xdata()
+        if type(self.line2.get_xdata()) == type([1,2]):
+            x2 = self.line2.get_xdata()[0]
+        else:
+            x2 = self.line2.get_xdata()
+        self.range_field.setText(str(int(abs(x1 - x2) * 1000)))
 
-        self._set_values()
+    def calculate_metrics_between_lines(self, event):
+        if type(self.line1.get_xdata()) == type([1,2]):
+            x1 = int(self.line1.get_xdata()[0]*self.fps)
+        else:
+            x1 = int(self.line1.get_xdata()*self.fps)
+        if type(self.line2.get_xdata()) == type([1,2]):
+            x2 = int(self.line2.get_xdata()[0]*self.fps)
+        else:
+            x2 = int(self.line2.get_xdata()*self.fps)
+
+        frames, _ = framing(sig=scale_data(self.data[x1:x2]), fs=self.fps,
+                                       win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
+        lster = round(low_short_time_energy_ratio(frames), 3)
+        self.lster_field.setText(str(lster))
+        hzcrr = round(high_zero_crossing_rate_ratio(frames), 3)
+        self.hzcrr_field.setText(str(hzcrr))
 
     def _mark_audio_type(self, axis):
         # Silent detection

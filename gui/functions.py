@@ -162,3 +162,20 @@ def detect_silence(data, vol_max):
         return False
     else:
         return True
+    
+def low_short_time_energy_ratio(frames):
+    ste = np.apply_along_axis(short_time_energy, 1, frames)
+    return 1/(2*frames.shape[0]) * np.sum(np.sign(0.5*np.mean(ste) - ste)+1 )
+
+def high_zero_crossing_rate_ratio(frames):
+    zcr = np.apply_along_axis(zero_crossing_rate, 1, frames)
+    return 1/(2*frames.shape[0]) * np.sum(np.sign(zcr - 1.5*np.mean(zcr))+1 )
+
+def fundamental_frequency_detection(data, fs):
+    f_min = 50
+    f_max = 400
+    lag_min = int(fs/f_max)
+    lag_max = int(fs/f_min)
+    index = np.argmax( np.array(
+        [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)] ) )
+    return fs/(lag_min+index)
