@@ -49,12 +49,14 @@ class MainWindow(QtWidgets.QMainWindow):
         load_button.clicked.connect(self.load_file)
         self.plot_type_menu = QtWidgets.QComboBox()
         self.plot_type_menu.addItems(['Short Time Energy', 'Zero Crossing Rate', 'Autocorrelation Function',
-                                      'Average Magnitude Difference', 'Fundamental Frequency Detection'])
+                                      'Average Magnitude Difference', 'Fundamental Frequency Detection',
+                                      'Unvoice Phones Detection'])
         self.plot_type_dict = {'Short Time Energy': (short_time_energy, False, False),
                                'Zero Crossing Rate': (zero_crossing_rate, False, False),
                                'Autocorrelation Function': (autocorrelation_function, True, False),
                                'Average Magnitude Difference': (average_magnitude_difference, True, False),
-                               'Fundamental Frequency Detection': (fundamental_frequency_detection, False, True)}
+                               'Fundamental Frequency Detection': (fundamental_frequency_detection, False, True),
+                               'Unvoice Phones Detection': (unvoice_phones_detection, False, True)}
         self.plot_type_menu.currentTextChanged.connect(self.change_plot)
 
         toolbar_layout.addWidget(self.toolbar)
@@ -235,7 +237,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if (self.fps is None) or (self.data is None):
             return
 
-        frames, frame_length = framing(sig=scale_data(self.data), fs=self.fps,
+        frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
                                        win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         if use_l:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
@@ -248,6 +250,8 @@ class MainWindow(QtWidgets.QMainWindow):
         time_seconds = len(self.data) / self.fps
         self.plot.axes[1].plot(np.linspace(0, time_seconds, len(data)), data)
         self.plot.axes[1].set_xlabel('Time (s)')
+        if func == unvoice_phones_detection:
+            self.plot.axes[1].hlines(0.45, xmin=0, xmax=time_seconds, colors='orange', linestyles='dashed')
         self._mark_audio_type(axis=1)
         self.plot.draw()
 
@@ -352,7 +356,7 @@ class MainWindow(QtWidgets.QMainWindow):
         j = 0
         for i in range(len(silence)):
             if silence[i]:
-                self._color_region(axis, frame_length*i, frame_length*(i+1), 'red', '_'*j + 'cisza')
+                self._color_region(axis, frame_length*i, frame_length*(i+1), 'red', '_'*j + 'silence')
                 j += 1
 
     def _color_region(self, axis, x1, x2, color, label):

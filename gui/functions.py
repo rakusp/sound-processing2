@@ -179,3 +179,17 @@ def fundamental_frequency_detection(data, fs):
     index = np.argmax( np.array(
         [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)] ) )
     return fs/(lag_min+index)
+
+def fundamental_frequency_detection_2(data, fs):
+    f_min = 50
+    f_max = 400
+    lag_min = int(fs/f_max)
+    lag_max = int(fs/f_min)
+    index = np.argmax( np.array(
+        [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)] ) )
+    return autocorrelation_function(data, index+lag_min)
+
+def unvoice_phones_detection(data, fs):
+    acf_max = fundamental_frequency_detection_2(data, fs)
+    acf_0 = autocorrelation_function(data, lag=0)
+    return acf_max/acf_0
