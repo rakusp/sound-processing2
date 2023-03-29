@@ -251,8 +251,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot.axes[1].plot(np.linspace(0, time_seconds, len(data)), data)
         self.plot.axes[1].set_xlabel('Time (s)')
         if func == unvoice_phones_detection:
-            self.plot.axes[1].hlines(0.45, xmin=0, xmax=time_seconds, colors='orange', linestyles='dashed')
+            self.plot.axes[1].hlines(0.45, xmin=0, xmax=time_seconds, colors='orange',
+                                     linestyles='dashed', label='the boundary between voiced and unvoiced phones')
         self._mark_audio_type(axis=1)
+        self.plot.axes[1].legend()
         self.plot.draw()
 
     def _set_values(self):
@@ -346,12 +348,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lster_field.setText(str(lster))
         hzcrr = round(high_zero_crossing_rate_ratio(frames), 3)
         self.hzcrr_field.setText(str(hzcrr))
+        self.ste_field.setText(str(round(short_time_energy(self.data[x1:x2]), 3)))
+        self.zcr_field.setText(str(round(zero_crossing_rate(self.data[x1:x2]), 3)))
+        self.acf_field.setText(str(round(autocorrelation_function(self.data[x1:x2], lag=self.lag), 3)))
+        self.amd_field.setText(str(round(average_magnitude_difference(self.data[x1:x2], lag=self.lag), 3)))
 
     def _mark_audio_type(self, axis):
         # Silent detection
         frame_length = 0.02 # for now this value is fixed
         frames, _ = framing(scale_data(self.data), self.fps, frame_length, frame_length)
-        silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=5e-3)
+        silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=10e-3)
 
         j = 0
         for i in range(len(silence)):

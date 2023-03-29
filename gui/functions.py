@@ -157,8 +157,8 @@ def detect_silence(data, vol_max):
     Returns:
         Boolean which indicate whether silence was detected 
     """
-    mean_vol = np.sum(np.abs(data))/len(data)
-    if mean_vol > vol_max:
+    vol = volume(data)
+    if vol > vol_max:
         return False
     else:
         return True
