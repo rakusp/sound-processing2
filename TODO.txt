@@ -11,7 +11,7 @@ Na 4.0:
 Poprzednie +
 + Skalowanie w osi x i y, przesuwanie, wyświetlanie znaczników określających granice
 + częstotliwość tonu podstawowego liczona w dziedzinie czasu
-- Określenie fragmentów dźwięcznych / bezdźwięcznych
++ Określenie fragmentów dźwięcznych / bezdźwięcznych
 +/- Określenie fragmentów muzyka / mowa
 - Porównanie wyników (w dokumentacji) dla różnych nagrań: radio (mowa + muzyka), mowa (głos
 męski, żeński), muzyka

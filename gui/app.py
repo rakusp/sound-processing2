@@ -253,6 +253,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if func == unvoice_phones_detection:
             self.plot.axes[1].hlines(0.45, xmin=0, xmax=time_seconds, colors='orange',
                                      linestyles='dashed', label='the boundary between voiced and unvoiced phones')
+        if func == zero_crossing_rate:
+            self.plot.axes[1].set_ylim([0, 1])
         self._mark_audio_type(axis=1)
         self.plot.axes[1].legend()
         self.plot.draw()
