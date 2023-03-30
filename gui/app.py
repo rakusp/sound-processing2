@@ -265,10 +265,13 @@ class MainWindow(QtWidgets.QMainWindow):
         data = scale_data(self.data)[int(min(x1, x2) * self.fps):int(max(x1, x2) * self.fps)]
         frames, _ = framing(sig=data, fs=self.fps,
                                        win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
+        frames2, _ = framing(sig=data, fs=self.fps,
+                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
         if len(data) == 0:
             return
         self.lster_field.setText(str(round(low_short_time_energy_ratio(frames), 3)))
-        self.hzcrr_field.setText(str(round(high_zero_crossing_rate_ratio(frames), 3)))
+        zcr = np.apply_along_axis(zero_crossing_rate, 1, frames2)
+        self.hzcrr_field.setText(str(round(high_zero_crossing_rate_ratio(zcr, zcr.shape[0]), 4)))
         self.ste_field.setText(str(round(short_time_energy(data), 3)))
         self.zcr_field.setText(str(round(zero_crossing_rate(data), 3)))
         self.acf_field.setText(str(round(autocorrelation_function(data, lag=self.lag), 3)))
@@ -347,12 +350,10 @@ class MainWindow(QtWidgets.QMainWindow):
         frames, _ = framing(sig=scale_data(self.data[x1:x2]), fs=self.fps,
                                        win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
         
-        lster = round(low_short_time_energy_ratio(frames), 3)
-        self.lster_field.setText(str(lster))
+        self.lster_field.setText(str(round(low_short_time_energy_ratio(frames), 4)))
 
         zcr = np.apply_along_axis(zero_crossing_rate, 1, frames)
-        hzcrr = round(high_zero_crossing_rate_ratio(zcr, zcr.shape[0]), 3)
-        self.hzcrr_field.setText(str(hzcrr))
+        self.hzcrr_field.setText(str(round(high_zero_crossing_rate_ratio(zcr, zcr.shape[0]), 4)))
 
         self.ste_field.setText(str(round(short_time_energy(self.data[x1:x2]), 3)))
         self.zcr_field.setText(str(round(zero_crossing_rate(self.data[x1:x2]), 3)))
