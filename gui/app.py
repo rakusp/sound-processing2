@@ -1,16 +1,15 @@
+import copy
+
+import matplotlib
 from PyQt5 import QtWidgets
-from PyQt5.QtGui import QIntValidator
 from PyQt5.QtCore import QUrl
+from PyQt5.QtGui import QIntValidator
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from matplotlib import pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.figure import Figure
+from scipy.io.wavfile import read
 
 from gui.functions import *
-from scipy.io.wavfile import read
-import numpy as np
-import matplotlib
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-import copy
 
 matplotlib.use('Qt5Agg')
 
@@ -78,7 +77,6 @@ class MainWindow(QtWidgets.QMainWindow):
         tip_label.setFixedHeight(15)
         plot_layout.addWidget(tip_label)
         self.plot.mpl_connect('button_press_event', self.select_range)
-        self.plot.mpl_connect('button_press_event', self.calculate_metrics_between_lines)
 
         # plot info
         info_layout = QtWidgets.QVBoxLayout()
@@ -221,7 +219,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self._set_values()
             frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+                                win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
             self._mark_silence(axis=0, frames=frames, frame_len=self.frame_len / 1000)
             self.plot.axes[0].legend()
             self.plot.draw()
@@ -241,9 +239,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
+                            win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         frames2, _ = framing(sig=scale_data(self.data), fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+                             win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
         if use_l:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
         elif use_fs:
@@ -269,15 +267,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot.draw()
 
     def _set_values(self):
-        x1 = self.line1.get_xdata()[0]
-        x2 = self.line2.get_xdata()[0]
-        data = scale_data(self.data)[int(min(x1, x2) * self.fps):int(max(x1, x2) * self.fps)]
+        x1, x2 = self._get_line_xpos()
+
+        data = scale_data(self.data)[int(x1 * self.fps):int(x2 * self.fps)]
         frames, _ = framing(sig=data, fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
+                            win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         frames2, _ = framing(sig=data, fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+                             win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
         if len(data) == 0:
             return
+
         self.lster_field.setText(str(round(low_short_time_energy_ratio(frames), 3)))
         zcr = np.apply_along_axis(zero_crossing_rate, 1, frames2)
         self.hzcrr_field.setText(str(round(high_zero_crossing_rate_ratio(zcr, zcr.shape[0]), 4)))
@@ -335,49 +334,19 @@ class MainWindow(QtWidgets.QMainWindow):
         elif event.button == 3:  # right
             self.line2.set_xdata(min(self.duration / 1000, max(0, event.xdata)))
         self.plot.draw()
-        
-        if type(self.line1.get_xdata()) == type([1,2]):
-            x1 = self.line1.get_xdata()[0]
-        else:
-            x1 = self.line1.get_xdata()
-        if type(self.line2.get_xdata()) == type([1,2]):
-            x2 = self.line2.get_xdata()[0]
-        else:
-            x2 = self.line2.get_xdata()
+
+        x1, x2 = self._get_line_xpos()
+
         self.range_field.setText(str(int(abs(x1 - x2) * 1000)))
-
-    def calculate_metrics_between_lines(self, event):
-        if type(self.line1.get_xdata()) == type([1,2]):
-            x1 = int(self.line1.get_xdata()[0]*self.fps)
-        else:
-            x1 = int(self.line1.get_xdata()*self.fps)
-        if type(self.line2.get_xdata()) == type([1,2]):
-            x2 = int(self.line2.get_xdata()[0]*self.fps)
-        else:
-            x2 = int(self.line2.get_xdata()*self.fps)
-
-        frames, _ = framing(sig=scale_data(self.data[x1:x2]), fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
-        
-        self.lster_field.setText(str(round(low_short_time_energy_ratio(frames), 4)))
-
-        zcr = np.apply_along_axis(zero_crossing_rate, 1, frames)
-        self.hzcrr_field.setText(str(round(high_zero_crossing_rate_ratio(zcr, zcr.shape[0]), 4)))
-
-        self.ste_field.setText(str(round(short_time_energy(self.data[x1:x2]), 3)))
-        self.zcr_field.setText(str(round(zero_crossing_rate(self.data[x1:x2]), 3)))
-        self.acf_field.setText(str(round(autocorrelation_function(self.data[x1:x2], lag=self.lag), 3)))
-        self.amd_field.setText(str(round(average_magnitude_difference(self.data[x1:x2], lag=self.lag), 3)))
+        self._set_values()
 
     def _mark_silence(self, axis, frames, frame_len):
-        # frame_len = self.fps * frame_len
         silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=10e-3)
         j = 0
         for i in range(len(silence)):
             if silence[i]:
-                self._color_region(axis, frame_len*i, frame_len*(i+1), 'red', '_'*j + 'silence')
+                self._color_region(axis, frame_len * i, frame_len * (i + 1), 'red', '_' * j + 'silence')
                 j += 1
-        # return silence
 
     def _mark_audio_type(self, axis, frame_len, silence, zcr):
         music_speech_boundary = 0.15
@@ -386,16 +355,29 @@ class MainWindow(QtWidgets.QMainWindow):
         m = 0
         s = 0
         for i in range(len(music_speech_array)):
-            if silence[i] == False:
+            if not silence[i]:
                 if zcr[i] > music_speech_boundary:
-                    self._color_region(axis, frame_len*i, frame_len*(i+1), 'orange', '_'*s + 'speech')
+                    self._color_region(axis, frame_len * i, frame_len * (i + 1), 'orange', '_' * s + 'speech')
                     s += 1
                 else:
-                    self._color_region(axis, frame_len*i, frame_len*(i+1), 'green', '_'*m + 'music')
+                    self._color_region(axis, frame_len * i, frame_len * (i + 1), 'green', '_' * m + 'music')
                     m += 1
-    
+
     def _color_region(self, axis, x1, x2, color, label):
         self.plot.axes[axis].axvspan(x1, x2, facecolor=color, label=label, alpha=0.3)
+
+    def _get_line_xpos(self):
+        if isinstance(self.line1.get_xdata(), list):
+            x1 = self.line1.get_xdata()[0]
+        else:
+            x1 = self.line1.get_xdata()
+        if isinstance(self.line2.get_xdata(), list):
+            x2 = self.line2.get_xdata()[0]
+        else:
+            x2 = self.line2.get_xdata()
+
+        return min(x1, x2), max(x1, x2)
+
 
 def hhmmss(ms):
     s = round(ms / 1000)
