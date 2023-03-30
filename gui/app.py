@@ -220,10 +220,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.player.setMedia(content)
 
             self._set_values()
-            # self._mark_audio_type(axis=0)
             frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
-                                       win_len=25 / 1000, win_hop=25 / 1000)
-            _ = self._mark_silence(axis=0, frames=frames, frame_len=int(25 / 1000))
+                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+            self._mark_silence(axis=0, frames=frames, frame_len=self.frame_len / 1000)
             self.plot.axes[0].legend()
             self.plot.draw()
 
@@ -263,9 +262,9 @@ class MainWindow(QtWidgets.QMainWindow):
                                      linestyles='dashed', label='the boundary between voiced and unvoiced phones')
         if func == zero_crossing_rate:
             self.plot.axes[1].set_ylim([0, 1])
-            self._mark_silence(axis=1, frames=frames2, frame_len=int(self.frame_len / 1000))
+            self._mark_silence(axis=1, frames=frames2, frame_len=self.frame_len / 1000)
             silence = np.apply_along_axis(detect_silence, 1, frames2, vol_max=10e-3)
-            self._mark_audio_type(axis=1, frame_len=int(self.frame_len / 1000), silence=silence, zcr=data)
+            self._mark_audio_type(axis=1, frame_len=self.frame_len / 1000, silence=silence, zcr=data)
         self.plot.axes[1].legend()
         self.plot.draw()
 
@@ -371,6 +370,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.amd_field.setText(str(round(average_magnitude_difference(self.data[x1:x2], lag=self.lag), 3)))
 
     def _mark_silence(self, axis, frames, frame_len):
+        # frame_len = self.fps * frame_len
         silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=10e-3)
         j = 0
         for i in range(len(silence)):
@@ -381,6 +381,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _mark_audio_type(self, axis, frame_len, silence, zcr):
         music_speech_boundary = 0.15
+        # frame_len = self.fps * frame_len
         music_speech_array = copy.deepcopy(silence)
         m = 0
         s = 0
