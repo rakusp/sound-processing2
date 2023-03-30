@@ -345,18 +345,22 @@ class MainWindow(QtWidgets.QMainWindow):
             x2 = int(self.line2.get_xdata()*self.fps)
 
         frames, _ = framing(sig=scale_data(self.data[x1:x2]), fs=self.fps,
-                                       win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
+                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+        
         lster = round(low_short_time_energy_ratio(frames), 3)
         self.lster_field.setText(str(lster))
-        hzcrr = round(high_zero_crossing_rate_ratio(frames), 3)
+
+        zcr = np.apply_along_axis(zero_crossing_rate, 1, frames)
+        hzcrr = round(high_zero_crossing_rate_ratio(zcr, zcr.shape[0]), 3)
         self.hzcrr_field.setText(str(hzcrr))
+
         self.ste_field.setText(str(round(short_time_energy(self.data[x1:x2]), 3)))
         self.zcr_field.setText(str(round(zero_crossing_rate(self.data[x1:x2]), 3)))
         self.acf_field.setText(str(round(autocorrelation_function(self.data[x1:x2], lag=self.lag), 3)))
         self.amd_field.setText(str(round(average_magnitude_difference(self.data[x1:x2], lag=self.lag), 3)))
 
     def _mark_audio_type(self, axis):
-        # Silent detection
+        # Silence detection
         frame_length = 0.02 # for now this value is fixed
         frames, _ = framing(scale_data(self.data), self.fps, frame_length, frame_length)
         silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=10e-3)
