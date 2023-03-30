@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+import copy
 
 matplotlib.use('Qt5Agg')
 
@@ -219,7 +220,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.player.setMedia(content)
 
             self._set_values()
-            self._mark_audio_type(axis=0)
+            # self._mark_audio_type(axis=0)
+            frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
+                                       win_len=25 / 1000, win_hop=25 / 1000)
+            _ = self._mark_silence(axis=0, frames=frames, frame_len=int(25 / 1000))
             self.plot.axes[0].legend()
             self.plot.draw()
 
@@ -239,10 +243,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
                                        win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
+        frames2, _ = framing(sig=scale_data(self.data), fs=self.fps,
+                                       win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
         if use_l:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
         elif use_fs:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, fs=self.fps)
+        elif func == zero_crossing_rate:
+            data = np.apply_along_axis(func1d=func, axis=1, arr=frames2)
         else:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames)
 
@@ -255,7 +263,9 @@ class MainWindow(QtWidgets.QMainWindow):
                                      linestyles='dashed', label='the boundary between voiced and unvoiced phones')
         if func == zero_crossing_rate:
             self.plot.axes[1].set_ylim([0, 1])
-        self._mark_audio_type(axis=1)
+            self._mark_silence(axis=1, frames=frames2, frame_len=int(self.frame_len / 1000))
+            silence = np.apply_along_axis(detect_silence, 1, frames2, vol_max=10e-3)
+            self._mark_audio_type(axis=1, frame_len=int(self.frame_len / 1000), silence=silence, zcr=data)
         self.plot.axes[1].legend()
         self.plot.draw()
 
@@ -360,21 +370,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self.acf_field.setText(str(round(autocorrelation_function(self.data[x1:x2], lag=self.lag), 3)))
         self.amd_field.setText(str(round(average_magnitude_difference(self.data[x1:x2], lag=self.lag), 3)))
 
-    def _mark_audio_type(self, axis):
-        # Silence detection
-        frame_length = 0.02 # for now this value is fixed
-        frames, _ = framing(scale_data(self.data), self.fps, frame_length, frame_length)
+    def _mark_silence(self, axis, frames, frame_len):
         silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=10e-3)
-
         j = 0
         for i in range(len(silence)):
             if silence[i]:
-                self._color_region(axis, frame_length*i, frame_length*(i+1), 'red', '_'*j + 'silence')
+                self._color_region(axis, frame_len*i, frame_len*(i+1), 'red', '_'*j + 'silence')
                 j += 1
+        # return silence
 
+    def _mark_audio_type(self, axis, frame_len, silence, zcr):
+        music_speech_boundary = 0.15
+        music_speech_array = copy.deepcopy(silence)
+        m = 0
+        s = 0
+        for i in range(len(music_speech_array)):
+            if silence[i] == False:
+                if zcr[i] > music_speech_boundary:
+                    self._color_region(axis, frame_len*i, frame_len*(i+1), 'orange', '_'*s + 'speech')
+                    s += 1
+                else:
+                    self._color_region(axis, frame_len*i, frame_len*(i+1), 'green', '_'*m + 'music')
+                    m += 1
+    
     def _color_region(self, axis, x1, x2, color, label):
         self.plot.axes[axis].axvspan(x1, x2, facecolor=color, label=label, alpha=0.3)
-
 
 def hhmmss(ms):
     s = round(ms / 1000)
