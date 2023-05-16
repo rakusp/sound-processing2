@@ -153,6 +153,7 @@ def detect_silence(data, vol_max):
 
     Args:
         data (array) : one dimensional signal
+        vol_max (float) : max volume for silence
 
     Returns:
         Boolean which indicate whether silence was detected 
@@ -164,13 +165,44 @@ def detect_silence(data, vol_max):
         return True
     
 def low_short_time_energy_ratio(frames):
+    """
+    Calculate ratio of frames for which short_time_energy
+    is smaller than 50% of avegare value.
+
+    Args:
+        frames (array) : audio signal divided into frames
+
+    Returns:
+        Float describing Low Short Time Energy Ratio
+    """
     ste = np.apply_along_axis(short_time_energy, 1, frames)
     return 1/(2*frames.shape[0]) * np.sum(np.sign(0.5*np.mean(ste) - ste)+1 )
 
 def high_zero_crossing_rate_ratio(zcr, data_len):
+    """
+    Calculate ratio of frames for which zero_crossing_rate
+    is greater than 150% of avegare value.
+
+    Args:
+        zcr (array) : array of caluculated zero_crossing_rate function
+        data_len (int) : number of samples in zcr array
+
+    Returns:
+        Float describing High Zero Crossing Rate Ratio
+    """
     return 1/(2*data_len) * np.sum(np.sign(zcr - 1.5*np.mean(zcr))+1 )
 
 def fundamental_frequency_detection(data, fs):
+    """
+    Calculate fundamental frequency which is between 50 and 400 Hz.
+
+    Args:
+        data (array) : one dimensional signal
+        fs (int) : signal frequency
+
+    Returns:
+        Fundamental frequency
+    """
     f_min = 50
     f_max = 400
     lag_min = int(fs/f_max)
@@ -180,6 +212,16 @@ def fundamental_frequency_detection(data, fs):
     return fs/(lag_min+index)
 
 def fundamental_frequency_detection_2(data, fs):
+    """
+    Function used in unvoiced phones detection
+
+    Args:
+        data (array) : one dimensional signal
+        fs (int) : signal frequency
+
+    Returns:
+        Fundamental frequency
+    """
     f_min = 50
     f_max = 400
     lag_min = int(fs/f_max)
@@ -189,6 +231,18 @@ def fundamental_frequency_detection_2(data, fs):
     return autocorrelation_function(data, index+lag_min)
 
 def unvoice_phones_detection(data, fs):
+    """
+    Calculate fraction of maximum value of autocorrelation_function
+    from function fundamental_frequency_detection_2 (R_max) and autocorrelation_function value
+    for lag = 0 (R(0)).
+
+    Args:
+        data (array) : one dimensional signal
+        fs (int) : signal frequency
+
+    Returns:
+        R_max/R(0)
+    """
     acf_max = fundamental_frequency_detection_2(data, fs)
     acf_0 = autocorrelation_function(data, lag=0)
     return acf_max/acf_0
