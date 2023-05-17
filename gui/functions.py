@@ -298,3 +298,24 @@ def spectral_crest_factor(data, fs, **kwargs):
     freq_0_bin, freq_1_bin, power_magnitudes = help_fun_1(data, fs, **kwargs)
     aritmetic_mean = np.mean(power_magnitudes[freq_0_bin:freq_1_bin])
     return np.max(power_magnitudes)/aritmetic_mean
+
+# Window functions ---------------------------------------------------------------
+
+def rectangular_window(win_len):
+    return np.repeat(1, win_len)
+
+def bartlett_window(win_len):
+    return np.array([(1-((2*np.abs(i-(win_len-1)/2)) / (win_len-1))) for i in range(win_len)])
+
+def hann_window(win_len):
+    return np.array([(0.5*(1-np.cos((2*np.pi*i)/(win_len-1)))) for i in range(win_len)])
+
+def hamming_window(win_len):
+    return np.array([(0.54-0.46*np.cos((2*np.pi*i)/(win_len-1))) for i in range(win_len)])
+
+def blackman_window(win_len):
+    return np.array([(0.42 - 0.5*np.cos((2*np.pi*i)/(win_len-1)) + 0.08*np.cos((4*np.pi*i)/(win_len-1))) for i in range(win_len)])
+
+def use_window_function(data, win_fun):
+    window = win_fun(len(data))
+    return data*window
