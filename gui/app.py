@@ -50,13 +50,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         load_button = QtWidgets.QPushButton(text='Load File')
         load_button.clicked.connect(self.load_file)
-        self.plot_type_menu = QtWidgets.QComboBox()
-        # self.plot_type_menu.addItems(['Short Time Energy', 'Zero Crossing Rate', 'Autocorrelation Function',
-        #                               'Average Magnitude Difference', 'Fundamental Frequency Detection',
-        #                               'Unvoice Phones Detection', 'Rectangular Window', 'Bartlett Window',
-        #                               'Hann Window', 'Hamming Window', 'Blackman Window', 'Spectral Centroid',
-        #                               'Effective Bandwidth', 'Band Energy Ratio', 'Spectral Flatness Measure',
-        #                               'Spectral Crest Factor'])
+
         self.plot_type_dict = {
             'Short Time Energy': (short_time_energy,),
             'Zero Crossing Rate': (zero_crossing_rate,),
@@ -68,25 +62,29 @@ class MainWindow(QtWidgets.QMainWindow):
             'Effective Bandwidth': (effective_bandwidth, 'use_kwargs'),
             'Band Energy Ratio': (band_energy_ratio, 'use_kwargs'),
             'Spectral Flatness Measure': (spectral_flatness_measure, 'use_kwargs'),
-            'Spectral Crest Factor': (spectral_crest_factor, 'use_kwargs'),
-            'Rectangular Window': (rectangular_window, 'use_window'),
-            'Bartlett Window': (bartlett_window, 'use_window'),
-            'Hann Window': (hann_window, 'use_window'),
-            'Hamming Window': (hamming_window, 'use_window'),
-            'Blackman Window': (blackman_window, 'use_window')
+            'Spectral Crest Factor': (spectral_crest_factor, 'use_kwargs')
         }
 
-        self.plot_type_menu.addItems(list(self.plot_type_dict.keys()))
+        self.window_type_dict = {
+            'No window': None,
+            'Rectangular Window': rectangular_window,
+            'Bartlett Window': bartlett_window,
+            'Hann Window': hann_window,
+            'Hamming Window': hamming_window,
+            'Blackman Window': blackman_window
+        }
 
+        self.plot_type_menu = QtWidgets.QComboBox()
+        self.plot_type_menu.addItems(list(self.plot_type_dict.keys()))
         self.plot_type_menu.currentTextChanged.connect(self.change_plot)
 
-        self.frequency_button = QtWidgets.QPushButton(text='Use frequency')
-        self.frequency_button.setCheckable(True)
-        self.frequency_button.clicked.connect(self._freq_button_clicked)
+        self.window_type_menu = QtWidgets.QComboBox()
+        self.window_type_menu.addItems(list(self.window_type_dict.keys()))
+        self.window_type_menu.currentTextChanged.connect(self.change_plot)
 
         toolbar_layout.addWidget(self.toolbar)
         toolbar_layout.addWidget(self.plot_type_menu)
-        toolbar_layout.addWidget(self.frequency_button)
+        toolbar_layout.addWidget(self.window_type_menu)
         toolbar_layout.addWidget(load_button)
         plot_layout.addLayout(toolbar_layout)
 
@@ -281,22 +279,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.range_field.setText(str(int(abs(self.line1.get_xdata()[0] - self.line2.get_xdata()[0]) * 1000)))
 
     def change_plot(self, s):
-        func, *args = self.plot_type_dict.get(s)
+        func, *args = self.plot_type_dict.get(self.plot_type_menu.currentText())
+        window_func = self.window_type_dict.get(self.window_type_menu.currentText())
         if (self.fps is None) or (self.data is None):
             return
 
-        frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
+        data = self.data
+        if window_func is not None:
+            frames2, _ = framing(sig=scale_data(data), fs=self.fps,
+                                 win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+            data = np.apply_along_axis(use_window_function, 1, frames2, window_func).reshape(-1)
+
+        frames, _ = framing(sig=scale_data(data), fs=self.fps,
                             win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
-        frames2, _ = framing(sig=scale_data(self.data), fs=self.fps,
+        frames2, _ = framing(sig=scale_data(data), fs=self.fps,
                              win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
 
-        if 'use_window' in args:
-            frames = self.data
-            self.data = np.apply_along_axis(use_window_function, 1, frames2, func).reshape(-1)
-            # if self.use_freq:
-            #     frames = create_spectrum(frames, self.fps)
-            data = self.data
-        elif 'use_kwargs' in args:
+        if 'use_kwargs' in args:
             kwargs = {'lag': self.lag, 'fs': self.fps, 'freq_0': self.freq0, 'freq_1': self.freq1}
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, **kwargs)
         elif 'use_lag' in args:
@@ -440,8 +439,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return min(x1, x2), max(x1, x2)
 
-    def _freq_button_clicked(self):
-        self.use_freq = not self.use_freq
 
 
 def hhmmss(ms):
