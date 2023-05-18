@@ -283,10 +283,8 @@ def help_fun_1(data, fs, **kwargs):
     magnitudes, freqs = create_spectrum(data, fs)
     freq_0 = kwargs.get("freq_0", 0)
     freq_1 = kwargs.get("freq_1", 2000)
-    freq_0_bin = np.where(freqs == freq_0)[0][0]
-    # To powoduje błąd, ponieważ nie ma takiego freq gdzie freqs == freq_1, ten sam błąd wystąpi gdy zmienisz freq_0
-    # index 0 is out of bounds for axis 0 with size 0
-    freq_1_bin = np.where(freqs == freq_1)[0][0] + 1
+    freq_0_bin = np.where(np.abs(freqs-freq_0) == np.min(np.abs(freqs-freq_0)))[0][0]
+    freq_1_bin = np.where(np.abs(freqs-freq_1) == np.min(np.abs(freqs-freq_1)))[0][0] + 1
     power_magnitudes = magnitudes ** 2
 
     return freq_0_bin, freq_1_bin, power_magnitudes
