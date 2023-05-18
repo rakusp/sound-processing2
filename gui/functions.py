@@ -147,6 +147,7 @@ def scale_data(data):
     scale = max(abs(np.min(data)), abs(np.max(data)))
     return np.divide(data, scale)
 
+
 def detect_silence(data, vol_max):
     """
     Detects silent for given signal data based on average abs value.
@@ -163,7 +164,8 @@ def detect_silence(data, vol_max):
         return False
     else:
         return True
-    
+
+
 def low_short_time_energy_ratio(frames):
     """
     Calculate ratio of frames for which short_time_energy
@@ -176,7 +178,8 @@ def low_short_time_energy_ratio(frames):
         Float describing Low Short Time Energy Ratio
     """
     ste = np.apply_along_axis(short_time_energy, 1, frames)
-    return 1/(2*frames.shape[0]) * np.sum(np.sign(0.5*np.mean(ste) - ste)+1 )
+    return 1 / (2 * frames.shape[0]) * np.sum(np.sign(0.5 * np.mean(ste) - ste) + 1)
+
 
 def high_zero_crossing_rate_ratio(zcr, data_len):
     """
@@ -190,7 +193,8 @@ def high_zero_crossing_rate_ratio(zcr, data_len):
     Returns:
         Float describing High Zero Crossing Rate Ratio
     """
-    return 1/(2*data_len) * np.sum(np.sign(zcr - 1.5*np.mean(zcr))+1 )
+    return 1 / (2 * data_len) * np.sum(np.sign(zcr - 1.5 * np.mean(zcr)) + 1)
+
 
 def fundamental_frequency_detection(data, fs):
     """
@@ -205,11 +209,12 @@ def fundamental_frequency_detection(data, fs):
     """
     f_min = 50
     f_max = 400
-    lag_min = int(fs/f_max)
-    lag_max = int(fs/f_min)
-    index = np.argmax( np.array(
-        [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)] ) )
-    return fs/(lag_min+index)
+    lag_min = int(fs / f_max)
+    lag_max = int(fs / f_min)
+    index = np.argmax(np.array(
+        [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)]))
+    return fs / (lag_min + index)
+
 
 def fundamental_frequency_detection_2(data, fs):
     """
@@ -224,11 +229,12 @@ def fundamental_frequency_detection_2(data, fs):
     """
     f_min = 50
     f_max = 400
-    lag_min = int(fs/f_max)
-    lag_max = int(fs/f_min)
-    index = np.argmax( np.array(
-        [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)] ) )
-    return autocorrelation_function(data, index+lag_min)
+    lag_min = int(fs / f_max)
+    lag_max = int(fs / f_min)
+    index = np.argmax(np.array(
+        [autocorrelation_function(data, lag) for lag in range(lag_min, lag_max)]))
+    return autocorrelation_function(data, index + lag_min)
+
 
 def unvoice_phones_detection(data, fs):
     """
@@ -245,4 +251,92 @@ def unvoice_phones_detection(data, fs):
     """
     acf_max = fundamental_frequency_detection_2(data, fs)
     acf_0 = autocorrelation_function(data, lag=0)
-    return acf_max/acf_0
+    return acf_max / acf_0
+
+
+# Functions for project no 2 ---------------------------------------------------------------
+
+def create_spectrum(data, fs, **kwargs):
+    magnitudes = np.abs(np.fft.rfft(data))
+    length = len(data)
+    freqs = np.abs(np.fft.fftfreq(length, 1.0 / fs)[:length // 2 + 1])
+
+    return magnitudes, freqs
+
+
+def spectral_centroid(data, fs, **kwargs):
+    magnitudes, freqs = create_spectrum(data, fs)
+
+    return np.sum(magnitudes * freqs) / np.sum(magnitudes)
+
+
+def effective_bandwidth(data, fs, **kwargs):
+    SC = kwargs.get("spectral_centroid", None)
+    if SC is None:
+        SC = spectral_centroid(data, fs)
+    magnitudes, freqs = create_spectrum(data, fs)
+
+    return np.sum(magnitudes ** 2 * (freqs - SC) ** 2) / np.sum(magnitudes ** 2)
+
+
+def help_fun_1(data, fs, **kwargs):
+    magnitudes, freqs = create_spectrum(data, fs)
+    freq_0 = kwargs.get("freq_0", 0)
+    freq_1 = kwargs.get("freq_1", 2000)
+    freq_0_bin = np.where(np.abs(freqs-freq_0) == np.min(np.abs(freqs-freq_0)))[0][0]
+    freq_1_bin = np.where(np.abs(freqs-freq_1) == np.min(np.abs(freqs-freq_1)))[0][0] + 1
+    power_magnitudes = magnitudes ** 2
+
+    return freq_0_bin, freq_1_bin, power_magnitudes
+
+
+def band_energy_ratio(data, fs, **kwargs):
+    freq_0_bin, freq_1_bin, power_magnitudes = help_fun_1(data, fs, **kwargs)
+    sum_power_in_range_frequencies = np.sum(power_magnitudes[freq_0_bin:freq_1_bin])
+    sum_power_out_range_frequencies = np.sum(power_magnitudes[:freq_0_bin]) + np.sum(power_magnitudes[freq_1_bin:])
+
+    return sum_power_in_range_frequencies / sum_power_out_range_frequencies
+
+
+def spectral_flatness_measure(data, fs, **kwargs):
+    freq_0_bin, freq_1_bin, power_magnitudes = help_fun_1(data, fs, **kwargs)
+    aritmetic_mean = np.mean(power_magnitudes[freq_0_bin:freq_1_bin])
+    if aritmetic_mean == 0:
+        return 1
+    geometric_mean = np.prod(power_magnitudes[freq_0_bin:freq_1_bin]) ** (1.0 / (freq_1_bin - freq_0_bin))
+    return geometric_mean / aritmetic_mean
+
+
+def spectral_crest_factor(data, fs, **kwargs):
+    freq_0_bin, freq_1_bin, power_magnitudes = help_fun_1(data, fs, **kwargs)
+    aritmetic_mean = np.mean(power_magnitudes[freq_0_bin:freq_1_bin])
+    return np.max(power_magnitudes) / aritmetic_mean
+
+
+# Window functions ---------------------------------------------------------------
+
+def rectangular_window(win_len):
+    return np.repeat(1, win_len)
+
+
+def bartlett_window(win_len):
+    return np.array([(1 - ((2 * np.abs(i - (win_len - 1) / 2)) / (win_len - 1))) for i in range(win_len)])
+
+
+def hann_window(win_len):
+    return np.array([(0.5 * (1 - np.cos((2 * np.pi * i) / (win_len - 1)))) for i in range(win_len)])
+
+
+def hamming_window(win_len):
+    return np.array([(0.54 - 0.46 * np.cos((2 * np.pi * i) / (win_len - 1))) for i in range(win_len)])
+
+
+def blackman_window(win_len):
+    return np.array(
+        [(0.42 - 0.5 * np.cos((2 * np.pi * i) / (win_len - 1)) + 0.08 * np.cos((4 * np.pi * i) / (win_len - 1))) for i
+         in range(win_len)])
+
+
+def use_window_function(data, win_fun):
+    window = win_fun(len(data))
+    return data * window

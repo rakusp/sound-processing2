@@ -18,7 +18,7 @@ class AudioPlot(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=9, height=3, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi, tight_layout=True)
         self.fig = fig
-        self.axes = fig.subplots(nrows=2, sharex=True)
+        self.axes = fig.subplots(nrows=2)
         self.axes[1].set_xlabel('Time (s)')
         super(AudioPlot, self).__init__(fig)
 
@@ -35,6 +35,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.frame_len = 25
         self.frame_hop = 10
         self.lag = 10
+        self.freq0 = 0
+        self.freq1 = 2000
+        self.use_freq = False
         self._setup()
 
     def _setup(self):
@@ -47,20 +50,41 @@ class MainWindow(QtWidgets.QMainWindow):
 
         load_button = QtWidgets.QPushButton(text='Load File')
         load_button.clicked.connect(self.load_file)
+
+        self.plot_type_dict = {
+            'Short Time Energy': (short_time_energy,),
+            'Zero Crossing Rate': (zero_crossing_rate,),
+            'Autocorrelation Function': (autocorrelation_function, 'use_lag'),
+            'Average Magnitude Difference': (average_magnitude_difference, 'use_lag'),
+            'Fundamental Frequency Detection': (fundamental_frequency_detection, 'use_fs'),
+            'Unvoice Phones Detection': (unvoice_phones_detection, 'use_fs'),
+            'Spectral Centroid': (spectral_centroid, 'use_kwargs'),
+            'Effective Bandwidth': (effective_bandwidth, 'use_kwargs'),
+            'Band Energy Ratio': (band_energy_ratio, 'use_kwargs'),
+            'Spectral Flatness Measure': (spectral_flatness_measure, 'use_kwargs'),
+            'Spectral Crest Factor': (spectral_crest_factor, 'use_kwargs')
+        }
+
+        self.window_type_dict = {
+            'No window': None,
+            'Rectangular Window': rectangular_window,
+            'Bartlett Window': bartlett_window,
+            'Hann Window': hann_window,
+            'Hamming Window': hamming_window,
+            'Blackman Window': blackman_window
+        }
+
         self.plot_type_menu = QtWidgets.QComboBox()
-        self.plot_type_menu.addItems(['Short Time Energy', 'Zero Crossing Rate', 'Autocorrelation Function',
-                                      'Average Magnitude Difference', 'Fundamental Frequency Detection',
-                                      'Unvoice Phones Detection'])
-        self.plot_type_dict = {'Short Time Energy': (short_time_energy, False, False),
-                               'Zero Crossing Rate': (zero_crossing_rate, False, False),
-                               'Autocorrelation Function': (autocorrelation_function, True, False),
-                               'Average Magnitude Difference': (average_magnitude_difference, True, False),
-                               'Fundamental Frequency Detection': (fundamental_frequency_detection, False, True),
-                               'Unvoice Phones Detection': (unvoice_phones_detection, False, True)}
+        self.plot_type_menu.addItems(list(self.plot_type_dict.keys()))
         self.plot_type_menu.currentTextChanged.connect(self.change_plot)
+
+        self.window_type_menu = QtWidgets.QComboBox()
+        self.window_type_menu.addItems(list(self.window_type_dict.keys()))
+        self.window_type_menu.currentTextChanged.connect(self.change_plot)
 
         toolbar_layout.addWidget(self.toolbar)
         toolbar_layout.addWidget(self.plot_type_menu)
+        toolbar_layout.addWidget(self.window_type_menu)
         toolbar_layout.addWidget(load_button)
         plot_layout.addLayout(toolbar_layout)
 
@@ -164,12 +188,32 @@ class MainWindow(QtWidgets.QMainWindow):
         lag_validator.setBottom(1)
         self.lag_field.setValidator(lag_validator)
 
+        freq0_label = QtWidgets.QLabel(text='freq_0')
+        self.freq0_field = QtWidgets.QLineEdit()
+        self.freq0_field.setText(str(self.freq0))
+        self.freq0_field.editingFinished.connect(self.params_changed)
+        freq0_validator = QIntValidator()
+        freq0_validator.setBottom(1)
+        self.freq0_field.setValidator(freq0_validator)
+
+        freq1_label = QtWidgets.QLabel(text='freq_1')
+        self.freq1_field = QtWidgets.QLineEdit()
+        self.freq1_field.setText(str(self.freq1))
+        self.freq1_field.editingFinished.connect(self.params_changed)
+        freq1_validator = QIntValidator()
+        freq1_validator.setBottom(1)
+        self.freq1_field.setValidator(freq1_validator)
+
         params_layout.addWidget(win_len_label, 0, 0)
         params_layout.addWidget(self.win_len_field, 0, 1)
         params_layout.addWidget(win_hop_label, 1, 0)
         params_layout.addWidget(self.win_hop_field, 1, 1)
         params_layout.addWidget(lag_label, 2, 0)
         params_layout.addWidget(self.lag_field, 2, 1)
+        params_layout.addWidget(freq0_label, 3, 0)
+        params_layout.addWidget(self.freq0_field, 3, 1)
+        params_layout.addWidget(freq1_label, 4, 0)
+        params_layout.addWidget(self.freq1_field, 4, 1)
 
         # setup layouts
         metrics_frame = QtWidgets.QFrame()
@@ -226,7 +270,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _draw_plot(self, fps, data):
         self.plot.fig.clear(keep_observers=True)
-        self.plot.axes = self.plot.fig.subplots(nrows=2, sharex='col')
+        # self.plot.axes = self.plot.fig.subplots(nrows=2, sharex='col')
+        self.plot.axes = self.plot.fig.subplots(nrows=2)
         self.plot.axes[0].plot(np.array(range(len(data))) / fps, data)
         self.plot.axes[1].set_xlabel('Time (s)')
         self.line1 = self.plot.axes[0].axvline(x=0, color='green')
@@ -234,17 +279,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self.range_field.setText(str(int(abs(self.line1.get_xdata()[0] - self.line2.get_xdata()[0]) * 1000)))
 
     def change_plot(self, s):
-        func, use_l, use_fs = self.plot_type_dict.get(s)
+        func, *args = self.plot_type_dict.get(self.plot_type_menu.currentText())
+        window_func = self.window_type_dict.get(self.window_type_menu.currentText())
         if (self.fps is None) or (self.data is None):
             return
 
-        frames, _ = framing(sig=scale_data(self.data), fs=self.fps,
+        data = self.data
+        if window_func is not None:
+            frames2, _ = framing(sig=scale_data(data), fs=self.fps,
+                                 win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+            data = np.apply_along_axis(use_window_function, 1, frames2, window_func).reshape(-1)
+
+        frames, _ = framing(sig=scale_data(data), fs=self.fps,
                             win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
-        frames2, _ = framing(sig=scale_data(self.data), fs=self.fps,
+        frames2, _ = framing(sig=scale_data(data), fs=self.fps,
                              win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
-        if use_l:
+
+        if 'use_kwargs' in args:
+            kwargs = {'lag': self.lag, 'fs': self.fps, 'freq_0': self.freq0, 'freq_1': self.freq1}
+            data = np.apply_along_axis(func1d=func, axis=1, arr=frames, **kwargs)
+        elif 'use_lag' in args:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
-        elif use_fs:
+        elif 'use_fs' in args:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, fs=self.fps)
         elif func == zero_crossing_rate:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames2)
@@ -263,6 +319,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._mark_silence(axis=1, frames=frames2, frame_len=self.frame_len / 1000)
             silence = np.apply_along_axis(detect_silence, 1, frames2, vol_max=10e-3)
             self._mark_audio_type(axis=1, frame_len=self.frame_len / 1000, silence=silence, zcr=data)
+
         self.plot.axes[1].legend()
         self.plot.draw()
 
@@ -310,6 +367,8 @@ class MainWindow(QtWidgets.QMainWindow):
         frame_len = int(self.win_len_field.text())
         frame_hop = int(self.win_hop_field.text())
         lag = int(self.lag_field.text())
+        freq0 = int(self.freq0_field.text())
+        freq1 = int(self.freq1_field.text())
 
         if frame_len < frame_hop:
             msg = QtWidgets.QMessageBox()
@@ -323,6 +382,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.frame_len = frame_len
         self.frame_hop = frame_hop
         self.lag = lag
+        self.freq0 = freq0
+        self.freq1 = freq1
 
         self.change_plot(s=self.plot_type_menu.currentText())
 
@@ -377,6 +438,7 @@ class MainWindow(QtWidgets.QMainWindow):
             x2 = self.line2.get_xdata()
 
         return min(x1, x2), max(x1, x2)
+
 
 
 def hhmmss(ms):
