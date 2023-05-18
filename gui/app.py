@@ -292,10 +292,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if 'use_window' in args:
             frames = self.data
-            # data = np.apply_along_axis(func1d=use_window_function, axis=1, arr=frames, win_fun=func)
-            if self.use_freq:
-                frames = create_spectrum(frames, self.fps)
-            data = use_window_function(frames, func)
+            self.data = np.apply_along_axis(use_window_function, 1, frames2, func).reshape(-1)
+            # if self.use_freq:
+            #     frames = create_spectrum(frames, self.fps)
+            data = self.data
         elif 'use_kwargs' in args:
             kwargs = {'lag': self.lag, 'fs': self.fps, 'freq_0': self.freq0, 'freq_1': self.freq1}
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, **kwargs)
