@@ -270,8 +270,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _draw_plot(self, fps, data):
         self.plot.fig.clear(keep_observers=True)
-        # self.plot.axes = self.plot.fig.subplots(nrows=2, sharex='col')
-        self.plot.axes = self.plot.fig.subplots(nrows=2)
+        self.plot.axes = self.plot.fig.subplots(nrows=2, sharex='col')
+        # self.plot.axes = self.plot.fig.subplots(nrows=2)
         self.plot.axes[0].plot(np.array(range(len(data))) / fps, data)
         self.plot.axes[1].set_xlabel('Time (s)')
         self.line1 = self.plot.axes[0].axvline(x=0, color='green')
