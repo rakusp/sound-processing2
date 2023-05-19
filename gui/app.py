@@ -271,8 +271,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _draw_plot(self, fps, data):
         self.plot.fig.clear(keep_observers=True)
-        # self.plot.axes = self.plot.fig.subplots(nrows=2, sharex='col')
-        self.plot.axes = self.plot.fig.subplots(nrows=2)
+        self.plot.axes = self.plot.fig.subplots(nrows=2, sharex='col')
+        # self.plot.axes = self.plot.fig.subplots(nrows=2)
         self.plot.axes[0].plot(np.array(range(len(data))) / fps, data)
         self.plot.axes[1].set_xlabel('Time (s)')
         self.line1 = self.plot.axes[0].axvline(x=0, color='green')
@@ -286,6 +286,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         data = self.data
+        x1, x2 = self._get_line_xpos()
+        data = self.data[int(x1 * self.fps):int(x2 * self.fps)]
         if window_func is not None:
             frames2, _ = framing(sig=scale_data(data), fs=self.fps,
                                  win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
@@ -304,8 +306,7 @@ class MainWindow(QtWidgets.QMainWindow):
         elif 'use_fs' in args:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, fs=self.fps)
         elif 'fft' in args:
-            x1, x2 = self._get_line_xpos()
-            data = scale_data(self.data)[int(x1 * self.fps):int(x2 * self.fps)]
+            data = scale_data(data)
             data, freqs = func(data, **kwargs)
         elif func == zero_crossing_rate:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames2)
