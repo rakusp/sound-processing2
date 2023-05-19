@@ -1,2 +1,2 @@
-# Sound Processing - project 1
+# Sound Processing - project 2
 ## Filip Szympliński, Patryk Rakus
