@@ -58,6 +58,7 @@ class MainWindow(QtWidgets.QMainWindow):
             'Average Magnitude Difference': (average_magnitude_difference, 'use_lag'),
             'Fundamental Frequency Detection': (fundamental_frequency_detection, 'use_fs'),
             'Unvoice Phones Detection': (unvoice_phones_detection, 'use_fs'),
+            'FFT': (create_spectrum, 'fft'),
             'Spectral Centroid': (spectral_centroid, 'use_kwargs'),
             'Effective Bandwidth': (effective_bandwidth, 'use_kwargs'),
             'Band Energy Ratio': (band_energy_ratio, 'use_kwargs'),
@@ -294,31 +295,40 @@ class MainWindow(QtWidgets.QMainWindow):
                             win_len=self.frame_len / 1000, win_hop=self.frame_hop / 1000)
         frames2, _ = framing(sig=scale_data(data), fs=self.fps,
                              win_len=self.frame_len / 1000, win_hop=self.frame_len / 1000)
+        kwargs = {'lag': self.lag, 'fs': self.fps, 'freq_0': self.freq0, 'freq_1': self.freq1}
 
         if 'use_kwargs' in args:
-            kwargs = {'lag': self.lag, 'fs': self.fps, 'freq_0': self.freq0, 'freq_1': self.freq1}
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, **kwargs)
         elif 'use_lag' in args:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, lag=self.lag)
         elif 'use_fs' in args:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames, fs=self.fps)
+        elif 'fft' in args:
+            x1, x2 = self._get_line_xpos()
+            data = scale_data(self.data)[int(x1 * self.fps):int(x2 * self.fps)]
+            data, freqs = func(data, **kwargs)
         elif func == zero_crossing_rate:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames2)
         else:
             data = np.apply_along_axis(func1d=func, axis=1, arr=frames)
 
-        self.plot.axes[1].clear()
-        time_seconds = len(self.data) / self.fps
-        self.plot.axes[1].plot(np.linspace(0, time_seconds, len(data)), data)
-        self.plot.axes[1].set_xlabel('Time (s)')
-        if func == unvoice_phones_detection:
-            self.plot.axes[1].hlines(0.45, xmin=0, xmax=time_seconds, colors='orange',
-                                     linestyles='dashed', label='the boundary between voiced and unvoiced phones')
-        if func == zero_crossing_rate:
-            self.plot.axes[1].set_ylim([0, 1])
-            self._mark_silence(axis=1, frames=frames2, frame_len=self.frame_len / 1000)
-            silence = np.apply_along_axis(detect_silence, 1, frames2, vol_max=10e-3)
-            self._mark_audio_type(axis=1, frame_len=self.frame_len / 1000, silence=silence, zcr=data)
+        if func == create_spectrum:
+            self.plot.axes[1].clear()
+            self.plot.axes[1].plot(freqs, data)
+            self.plot.axes[1].set_xlabel('Frequency (HZ)')
+        else:
+            self.plot.axes[1].clear()
+            time_seconds = len(self.data) / self.fps
+            self.plot.axes[1].plot(np.linspace(0, time_seconds, len(data)), data)
+            self.plot.axes[1].set_xlabel('Time (s)')
+            if func == unvoice_phones_detection:
+                self.plot.axes[1].hlines(0.45, xmin=0, xmax=time_seconds, colors='orange',
+                                        linestyles='dashed', label='the boundary between voiced and unvoiced phones')
+            if func == zero_crossing_rate:
+                self.plot.axes[1].set_ylim([0, 1])
+                self._mark_silence(axis=1, frames=frames2, frame_len=self.frame_len / 1000)
+                silence = np.apply_along_axis(detect_silence, 1, frames2, vol_max=10e-3)
+                self._mark_audio_type(axis=1, frame_len=self.frame_len / 1000, silence=silence, zcr=data)
 
         self.plot.axes[1].legend()
         self.plot.draw()
@@ -400,6 +410,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.range_field.setText(str(int(abs(x1 - x2) * 1000)))
         self._set_values()
+        self.change_plot(s=self.plot_type_menu.currentText())
 
     def _mark_silence(self, axis, frames, frame_len):
         silence = np.apply_along_axis(detect_silence, 1, frames, vol_max=10e-3)
